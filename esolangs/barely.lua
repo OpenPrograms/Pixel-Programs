@@ -1,5 +1,5 @@
 -- Barely in OC by PixelToast
-local program="xjhhhhxooooooooxooooooxjjjxhhoohhhhxjjjjjjjjhxooooooooooooxjhhhhxjjjxxjjjjjjjxjjjhhhhhhxjjjjjjjjjjjjjjhhhh~"
+local program="]xhhhhooooooooohhhhhhxooooooooxooooooxjjjxhoooohhhxhohhhhhhhxhhhhjjjhhhxhhhhooooooooohhhhhhxjjjxxjjjjjjjxjhhhhxjhhhhhhhhjjjhh~"
 if program:match("[^%]%^bfghijklmnopqstx~]") or not program:match("~$") then
 	return "Invalid program."
 end
@@ -24,7 +24,7 @@ while ip>0 and ip<#program+1 do
 		acc=cell[mp]
 		se="i"
 	elseif ins=="h" then
-		acc=(acc+47)%256
+		acc=(acc+71)%256
 		se="k"
 	elseif ins=="i" then
 		mp=mp+1
@@ -43,7 +43,7 @@ while ip>0 and ip<#program+1 do
 		acc=(acc-1)%256
 		se="p"
 	elseif ins=="p" then
-		jmp=jmp+10
+		jmp=jmp+16
 	elseif ins=="t" then
 		acc=io.read(1):byte()
 	elseif ins=="x" then
