@@ -14,4 +14,4 @@ assert(loadstring(
 	end)
 	:gsub("%.","\nio.write(string.char(s[p] or 0))")
 	:gsub(",","\ns[p]=string.byte(io.read(1))")
-.."=brainfuck"))()
+,"=brainfuck"))()
