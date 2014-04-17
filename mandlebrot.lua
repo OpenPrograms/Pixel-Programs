@@ -1,4 +1,5 @@
 -- optimized mandlebrot renderer
+-- http://puu.sh/8cs0i
 local component=require("component")
 local event=require("event")
 local term=require("term")
