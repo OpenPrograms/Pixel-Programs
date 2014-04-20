@@ -35,8 +35,10 @@ local version=0
 			data[x][y]=8 bit color
 		yx8:
 			data[y][x]=8 bit color
-		<number>:
+		<number> or str:
 			image is encoded as a string with 8 bit colors and width is <number>
+	
+	returns output,width,height
 ]]
 
 local function round(num)
@@ -227,9 +229,13 @@ local function encode(data,mode,omode,meta)
 				out[y][x]=c24to8(inp[y][x])
 			end
 		end
-	elseif tonumber(omode) then
-		local w=tonumber(omode)
-		
+	elseif omode=="str" then
+		out=""
+		for y=1,hi do
+			for x=1,wd do
+				out=out..string.char(c24to8(inp[y][x]))
+			end
+		end
 	end
 	return out,wd,hi
 end
@@ -266,7 +272,7 @@ local function render(data,x,y)
 		local h=data:byte(l1+2)
 		-- fill space
 		gpu.setBackground(c8to24(data:byte(l1)))
-		gpu.fill(x+cx-1,y+cy-1,cx+w-1,cy+h-1," ")
+		gpu.fill(x+cx-1,y+cy-1,w,h," ")
 		for sy=cy,cy+h-1 do
 			for sx=cx,cx+w-1 do
 				f[sy][sx]=true
@@ -274,8 +280,9 @@ local function render(data,x,y)
 		end
 		-- find next pixel
 		while f[cy][cx] do
-			cx=(cx+1)%(width+1)
+			cx=cx+1
 			cy=cy+math.floor(cx/(width+1))
+			cx=((cx-1)%width)+1
 		end
 	end
 end
