@@ -44,24 +44,14 @@ local version=0
 local function round(num)
 	return math.floor(num+0.5)
 end
-local function c24to8(num)
-	return (round(
-		(bit32.rshift(num,16)*7)/255
-	)*32)+(round(
-		((bit32.rshift(num,8)%256)*7)/255
-	)*4)+round(
-		((num%256)*3)/255
-	)
+function c24to8(num)
+  return round(bit32.rshift(num,16)*7/255)*32+round((bit32.rshift(num,8)%256)*7/255)*4+round((num%256)*3/255)
 end
-local function c8to24(num)
-	return (math.floor(
-		(math.floor(num/32)*255)/7
-	)*65536)+(math.floor(
-		(math.floor(num/4)%8)*255/7
-	)*256)+math.floor(
-		(num%4)/3
-	)
+
+function c8to24(c)
+  return round(math.floor(c/32)*255/7)*65536+round((math.floor(c/4)%8)*255/7)*256+round((c%4)*255/3)
 end
+
 local function encode(data,mode,omode,meta)
 	mode=mode or "xy24"
 	omode=omode or "oci"
