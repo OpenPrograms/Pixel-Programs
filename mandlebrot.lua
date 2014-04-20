@@ -8,8 +8,8 @@ local term=require("term")
 local unicode=require("unicode")
 local gpu=component.gpu
 local oldw,oldh=gpu.getResolution()
+local w,h=gpu.maxResolution()
 local err,res=pcall(function()
-	local w,h=gpu.maxResolution()
 	gpu.setResolution(w,h)
 	local depth=32
 	local x0=-1.5
