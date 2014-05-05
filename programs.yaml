@@ -40,3 +40,6 @@ malbolge:
 superstack:
 	/blob/master/esolangs/superstack.lua
 	SuperStack! esolang
+test:
+	/blob/master/esolangs/superstack.lua
+	testing ^v's auto update :3
