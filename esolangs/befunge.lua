@@ -6,7 +6,6 @@ local prg='0"!dlroW ,olleH">:#,_@'
 
 local component=require("component")
 local gpu=component.gpu
-local pt=require("pt")
 local mem={}
 local width=0
 local sy=0
