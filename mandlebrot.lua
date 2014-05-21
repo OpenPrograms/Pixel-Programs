@@ -6,16 +6,18 @@ local component=require("component")
 local event=require("event")
 local term=require("term")
 local unicode=require("unicode")
+local oci=require("oci")
+local s=require("serialization")
 local gpu=component.gpu
 local oldw,oldh=gpu.getResolution()
 local w,h=gpu.maxResolution()
+local x0=-2
+local y0=-1
+local x1=0.5
+local y1=1
 local err,res=pcall(function()
 	gpu.setResolution(w,h)
 	local depth=32
-	local x0=-1.5
-	local y0=-1
-	local x1=0.5
-	local y1=1
 	local zoom={}
 	while true do
 		local dx=x1-x0
@@ -51,108 +53,8 @@ local err,res=pcall(function()
 				map[y+1][x+1]=c
 			end
 		end
-		local muc
-		local mun
-		for k,v in pairs(mu) do
-			if v>(mun or 0) then
-				muc=k
-				mun=v
-			end
-		end
-		gpu.setBackground(muc)
-		term.clear()
-		local cmp={}
-		for y=1,h do
-			cmp[y]={}
-			local c=map[y]
-			for x=1,w do
-				local cc=c[x]
-				if cc~=muc then
-					local mx=y+x
-					local ct={y,x}
-					local pmn=w
-					for cy=y,h do
-						if map[cy][x]~=cc then
-							break
-						end
-						local m=x
-						for cx=x,pmn do
-							if map[cy][cx]~=cc then
-								break
-							end
-							m=cx
-						end
-						pmn=math.min(pmn,m)
-						if m+cy>mx then
-							ct={cy,m}
-						end
-					end
-					cmp[y][x]=ct
-				end
-			end
-		end
-		local opt=0
-		for y=1,h do
-			local c=cmp[y]
-			for x=1,w do
-				local cc=c[x]
-				if cc then
-					local sz=(cc[1]-y)+(cc[2]-x)
-					for sy=y,cc[1] do
-						for sx=x,cc[2] do
-							local sc=cmp[sy][sx]
-							if sc and (sx~=x or sy~=y) and sc[1]<=cc[1] and sc[2]<=cc[2] and (sc[1]-sy)+(sc[2]-sx)<sz then
-								cmp[sy][sx]=nil
-								opt=opt+1
-							end
-						end
-					end
-				end
-			end
-		end
-		local ins={}
-		for y=1,h do
-			local c=cmp[y]
-			for x=1,w do
-				local cc=c[x]
-				if cc then
-					table.insert(ins,{(cc[1]-y)+(cc[2]-x),map[y][x],x,y,(cc[2]-x)+1,(cc[1]-y)+1})
-				end
-			end
-		end
-		table.sort(ins,function(a,b)
-			return a[1]>b[1]
-		end)
-		for i=1,#ins do
-			local t=ins[i]
-			gpu.setBackground(t[2])
-			gpu.fill(t[3],t[4],t[5],t[6]," ")
-		end
-		--[====[
-		for y=1,h do
-			local c=map[y]
-			local u={}
-			local cr=1
-			while cr<w+1 do
-				local cc=c[cr]
-				if not u[cc] then
-					u[cc]=true
-					local l={}
-					for l1=cr,w do
-						if c[l1]==cc then
-							table.insert(l,l1)
-						else
-							u[c[l1]]=false
-						end
-					end
-					gpu.setBackground(cc)
-					gpu.set(cr,y,(" "):rep((l[#l]-cr)+1))
-				end
-				cr=cr+1
-			end
-		end
-		]====]
-		local char=unicode.char(0x2588)
+		local dat=oci.encode(map,"yx24","oci")
+		oci.render(dat)
 		local ax
 		local ay
 		local bx
@@ -187,6 +89,7 @@ end)
 gpu.setBackground(0x000000)
 term.clear()
 gpu.setResolution(oldw,oldh)
+print("zoom:",x0,y0,x1,y1)
 if not err and type(res)~="table" then
 	print(res)
 end
