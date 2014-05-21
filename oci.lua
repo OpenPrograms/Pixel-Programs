@@ -65,7 +65,7 @@ local function encode(data,mode,omode,meta)
 		end
 		data=data:sub(4)
 		local version=data:byte(1,1)
-		local meta,width,data=data:match("$.(.-)%z(.)(.+)")
+		local meta,width,data=data:match("^.(.-)%z(.)(.+)")
 		width=width:byte()
 		wd=width
 		hi=0
