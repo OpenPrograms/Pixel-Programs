@@ -1,3 +1,9 @@
+bit64:
+	/blob/master/bit64.lua
+	bit library that supports 64 bit integers
+sha512:
+	/blob/master/sha512.lua
+	SHA 512 algorithm using bit64
 TCPNet:
 	P-T-/TCPNet
 	Cross-server communication
