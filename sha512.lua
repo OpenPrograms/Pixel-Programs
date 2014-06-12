@@ -26,7 +26,7 @@ local k={[0]=
 	{0x431d67c4,0x9c100d4c},{0x4cc5d4be,0xcb3e42b6},{0x597f299c,0xfc657e2a},{0x5fcb6fab,0x3ad6faec},{0x6c44198c,0x4a475817}
 }
 
-function chars2num(txt)
+local function chars2num(txt)
 	return {
 		(txt:byte(1)*16777216)+(txt:byte(2)*65536)+(txt:byte(3)*256)+(txt:byte(4)),
 		(txt:byte(5)*16777216)+(txt:byte(6)*65536)+(txt:byte(7)*256)+(txt:byte(8))
