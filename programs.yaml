@@ -1,3 +1,6 @@
+crypt:
+	/blob/master/crypt.lua
+	all in one crypto library
 bit64:
 	/blob/master/bit64.lua
 	bit library that supports 64 bit integers
