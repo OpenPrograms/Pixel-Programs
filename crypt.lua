@@ -15,20 +15,25 @@
 --   hash:
 --     sha256(txt[,nohex])
 --     sha512(txt[,nohex])
---   checksum:
+--   sum:
 --     crc32(txt[,nohex])
 --     crc64(txt[,nohex])
 --   encrypt:
---     rc4(key[,state]) returns function to encrypt and the state table
+--     rc4(key[,state]) returns encrypt(txt[,nohex]) and the state table
 --   decrypt:
---     rc4(key[,state]) returns function to encrypt and the state table
+--     rc4(key[,state]) returns decrypt(txt[,nohex]) and the state table
 --   encode:
 --     b64(txt)
 --     hex(txt)
 --   decode (no error checking, so watch out):
 --     b64(txt)
 --     hex(txt)
+-- benchmarks:
+--   sha256 2653/s
+--   sha512 130/s
+--   crc32 750/s
 -- todo:
+--   bignum
 --   signatures
 --   DH
 --   network protocol
@@ -44,33 +49,9 @@ local rrotate=bit32.rrotate
 local lrotate=bit32.lrotate
 local byte=string.byte
 local char=string.char
+local sub=string.sub
 local format=string.format
 local floor=math.floor
-
-local function chars2num(txt)
-	return (txt:byte(1)*16777216)+(txt:byte(2)*65536)+(txt:byte(3)*256)+(txt:byte(4))
-end
-
-local function limit(num)
-	return band(num)
-end
-
-local function num2chars(num,l)
-	local out=""
-	for l1=1,l or 4 do
-		out=char(floor(num/(256^(l1-1)))%256)..out
-	end
-	return out
-end
-
-local _num2hex={}
-for l1=0,255 do
-	hr[l1]=format("%02x",l1)
-end
-
-local function num2hex(num)
-	return _num2hex[floor(num/16777216)%256].._num2hex[floor(num/65536)%256].._num2hex[floor(num/256)%256].._num2hex[num%256]
-end
 
 local function to64(...)
 	local o={}
@@ -100,14 +81,22 @@ local function unpackn(t,i)
 	return table.unpack(o)
 end
 
-local function band64(...)
+local function blim64(a)
+	return {band(a[1]),band(a[2])}
+end
+
+local function band64(a,...)
 	local p={...}
-	local a,b=0,0
+	local c1,c2=a[1],a[2]
 	for i=1,#p do
-		a=band(a,p[i][1])
-		b=band(b,p[i][2])
+		c1=band(c1,p[i][1])
+		c2=band(c2,p[i][2])
 	end
-	return {a,b}
+	return {c1,c2}
+end
+
+local function b2and64(a,b)
+	return {band(a[1],b[1]),band(a[2],b[2])}
 end
 
 local function bor64(...)
@@ -132,6 +121,14 @@ local function bxor64(...)
 		b=bxor(b,p[i][2])
 	end
 	return {a,b}
+end
+
+local function b2xor64(a,b)
+	return {bxor(a[1],b[1]),bxor(a[2],b[2])}
+end
+
+local function b3xor64(a,b,c)
+	return {bxor(a[1],b[1],c[1]),bxor(a[2],b[2],c[2])}
 end
 
 local function lshift64(a,b)
@@ -169,6 +166,38 @@ local function add64(...)
 		c[2]=band(c[2])
 	end
 	return c
+end
+
+local function add264(a,b)
+	a[2]=a[2]+b[2]
+	a[1]=band(b[1]+a[1]+floor(a[2]/0x100000000))
+	a[2]=band(a[2])
+	return a
+end
+
+local function chars2num(txt)
+	return (txt:byte(1)*16777216)+(txt:byte(2)*65536)+(txt:byte(3)*256)+(txt:byte(4))
+end
+
+local function limit(num)
+	return band(num)
+end
+
+local function num2chars(num,l)
+	local out=""
+	for l1=1,l or 4 do
+		out=char(floor(num/(256^(l1-1)))%256)..out
+	end
+	return out
+end
+
+local _num2hex={}
+for l1=0,255 do
+	_num2hex[l1]=format("%02x",l1)
+end
+
+local function num2hex(num)
+	return _num2hex[floor(num/16777216)%256].._num2hex[floor(num/65536)%256].._num2hex[floor(num/256)%256].._num2hex[num%256]
 end
 
 local function chars2num64(txt)
@@ -240,33 +269,31 @@ do
 	end
 end
 
-local sha512
+local k={[0]=
+	{0x428a2f98,0xd728ae22},{0x71374491,0x23ef65cd},{0xb5c0fbcf,0xec4d3b2f},{0xe9b5dba5,0x8189dbbc},{0x3956c25b,0xf348b538},
+	{0x59f111f1,0xb605d019},{0x923f82a4,0xaf194f9b},{0xab1c5ed5,0xda6d8118},{0xd807aa98,0xa3030242},{0x12835b01,0x45706fbe},
+	{0x243185be,0x4ee4b28c},{0x550c7dc3,0xd5ffb4e2},{0x72be5d74,0xf27b896f},{0x80deb1fe,0x3b1696b1},{0x9bdc06a7,0x25c71235},
+	{0xc19bf174,0xcf692694},{0xe49b69c1,0x9ef14ad2},{0xefbe4786,0x384f25e3},{0x0fc19dc6,0x8b8cd5b5},{0x240ca1cc,0x77ac9c65},
+	{0x2de92c6f,0x592b0275},{0x4a7484aa,0x6ea6e483},{0x5cb0a9dc,0xbd41fbd4},{0x76f988da,0x831153b5},{0x983e5152,0xee66dfab},
+	{0xa831c66d,0x2db43210},{0xb00327c8,0x98fb213f},{0xbf597fc7,0xbeef0ee4},{0xc6e00bf3,0x3da88fc2},{0xd5a79147,0x930aa725},
+	{0x06ca6351,0xe003826f},{0x14292967,0x0a0e6e70},{0x27b70a85,0x46d22ffc},{0x2e1b2138,0x5c26c926},{0x4d2c6dfc,0x5ac42aed},
+	{0x53380d13,0x9d95b3df},{0x650a7354,0x8baf63de},{0x766a0abb,0x3c77b2a8},{0x81c2c92e,0x47edaee6},{0x92722c85,0x1482353b},
+	{0xa2bfe8a1,0x4cf10364},{0xa81a664b,0xbc423001},{0xc24b8b70,0xd0f89791},{0xc76c51a3,0x0654be30},{0xd192e819,0xd6ef5218},
+	{0xd6990624,0x5565a910},{0xf40e3585,0x5771202a},{0x106aa070,0x32bbd1b8},{0x19a4c116,0xb8d2d0c8},{0x1e376c08,0x5141ab53},
+	{0x2748774c,0xdf8eeb99},{0x34b0bcb5,0xe19b48a8},{0x391c0cb3,0xc5c95a63},{0x4ed8aa4a,0xe3418acb},{0x5b9cca4f,0x7763e373},
+	{0x682e6ff3,0xd6b2b8a3},{0x748f82ee,0x5defb2fc},{0x78a5636f,0x43172f60},{0x84c87814,0xa1f0ab72},{0x8cc70208,0x1a6439ec},
+	{0x90befffa,0x23631e28},{0xa4506ceb,0xde82bde9},{0xbef9a3f7,0xb2c67915},{0xc67178f2,0xe372532b},{0xca273ece,0xea26619c},
+	{0xd186b8c7,0x21c0c207},{0xeada7dd6,0xcde0eb1e},{0xf57d4f7f,0xee6ed178},{0x06f067aa,0x72176fba},{0x0a637dc5,0xa2c898a6},
+	{0x113f9804,0xbef90dae},{0x1b710b35,0x131c471b},{0x28db77f5,0x23047d84},{0x32caab7b,0x40c72493},{0x3c9ebe0a,0x15c9bebc},
+	{0x431d67c4,0x9c100d4c},{0x4cc5d4be,0xcb3e42b6},{0x597f299c,0xfc657e2a},{0x5fcb6fab,0x3ad6faec},{0x6c44198c,0x4a475817}
+}
 do
-	local k={[0]=
-		{0x428a2f98,0xd728ae22},{0x71374491,0x23ef65cd},{0xb5c0fbcf,0xec4d3b2f},{0xe9b5dba5,0x8189dbbc},{0x3956c25b,0xf348b538},
-		{0x59f111f1,0xb605d019},{0x923f82a4,0xaf194f9b},{0xab1c5ed5,0xda6d8118},{0xd807aa98,0xa3030242},{0x12835b01,0x45706fbe},
-		{0x243185be,0x4ee4b28c},{0x550c7dc3,0xd5ffb4e2},{0x72be5d74,0xf27b896f},{0x80deb1fe,0x3b1696b1},{0x9bdc06a7,0x25c71235},
-		{0xc19bf174,0xcf692694},{0xe49b69c1,0x9ef14ad2},{0xefbe4786,0x384f25e3},{0x0fc19dc6,0x8b8cd5b5},{0x240ca1cc,0x77ac9c65},
-		{0x2de92c6f,0x592b0275},{0x4a7484aa,0x6ea6e483},{0x5cb0a9dc,0xbd41fbd4},{0x76f988da,0x831153b5},{0x983e5152,0xee66dfab},
-		{0xa831c66d,0x2db43210},{0xb00327c8,0x98fb213f},{0xbf597fc7,0xbeef0ee4},{0xc6e00bf3,0x3da88fc2},{0xd5a79147,0x930aa725},
-		{0x06ca6351,0xe003826f},{0x14292967,0x0a0e6e70},{0x27b70a85,0x46d22ffc},{0x2e1b2138,0x5c26c926},{0x4d2c6dfc,0x5ac42aed},
-		{0x53380d13,0x9d95b3df},{0x650a7354,0x8baf63de},{0x766a0abb,0x3c77b2a8},{0x81c2c92e,0x47edaee6},{0x92722c85,0x1482353b},
-		{0xa2bfe8a1,0x4cf10364},{0xa81a664b,0xbc423001},{0xc24b8b70,0xd0f89791},{0xc76c51a3,0x0654be30},{0xd192e819,0xd6ef5218},
-		{0xd6990624,0x5565a910},{0xf40e3585,0x5771202a},{0x106aa070,0x32bbd1b8},{0x19a4c116,0xb8d2d0c8},{0x1e376c08,0x5141ab53},
-		{0x2748774c,0xdf8eeb99},{0x34b0bcb5,0xe19b48a8},{0x391c0cb3,0xc5c95a63},{0x4ed8aa4a,0xe3418acb},{0x5b9cca4f,0x7763e373},
-		{0x682e6ff3,0xd6b2b8a3},{0x748f82ee,0x5defb2fc},{0x78a5636f,0x43172f60},{0x84c87814,0xa1f0ab72},{0x8cc70208,0x1a6439ec},
-		{0x90befffa,0x23631e28},{0xa4506ceb,0xde82bde9},{0xbef9a3f7,0xb2c67915},{0xc67178f2,0xe372532b},{0xca273ece,0xea26619c},
-		{0xd186b8c7,0x21c0c207},{0xeada7dd6,0xcde0eb1e},{0xf57d4f7f,0xee6ed178},{0x06f067aa,0x72176fba},{0x0a637dc5,0xa2c898a6},
-		{0x113f9804,0xbef90dae},{0x1b710b35,0x131c471b},{0x28db77f5,0x23047d84},{0x32caab7b,0x40c72493},{0x3c9ebe0a,0x15c9bebc},
-		{0x431d67c4,0x9c100d4c},{0x4cc5d4be,0xcb3e42b6},{0x597f299c,0xfc657e2a},{0x5fcb6fab,0x3ad6faec},{0x6c44198c,0x4a475817}
-	}
-	
-	local ha,len,w,rawchunk,a,b,c,d,e,f,g,h,temp1,cnv
 	local c1={0,1}
 	local c6={0,6}
 	local c7={0,7}
 	local c8={0,8}
 	local c14={0,14}
+	local c18={0,18}
 	local c18={0,18}
 	local c19={0,19}
 	local c28={0,28}
@@ -274,6 +301,7 @@ do
 	local c39={0,39}
 	local c41={0,41}
 	local c61={0,61}
+	local ha,len,w,rawchunk,a,b,c,d,e,f,g,h,temp1,cnv
 	function sha512(txt,nohex)
 		ha={[0]=
 			{0x6a09e667,0xf3bcc908},{0xbb67ae85,0x84caa73b},{0x3c6ef372,0xfe94f82b},{0xa54ff53a,0x5f1d36f1},
@@ -285,30 +313,17 @@ do
 		for chunkind=1,#txt,128 do
 			rawchunk=txt:sub(chunkind,chunkind+127)
 			for i=1,128,8 do
-				w[floor(i/8)]=chars2num64(rawchunk:sub(i))
+				w[floor(i/8)]=chars2num64(sub(rawchunk,i))
 			end
 			for i=16,79 do
-				w[i]=add64(
-					w[i-16],
-					bxor64(
-						rrotate64(w[i-15],c1),
-						rrotate64(w[i-15],c8),
-						rshift64(w[i-15],c7)
-					),
-					w[i-7],
-					bxor64(
-						rrotate64(w[i-2],c19),
-						rrotate64(w[i-2],c61),
-						rshift64(w[i-2],c6)
-					)
-				)
+				w[i]=add64(w[i-16],b3xor64(rrotate64(w[i-15],c1),rrotate64(w[i-15],c8),rshift64(w[i-15],c7)),w[i-7],b3xor64(rrotate64(w[i-2],c19),rrotate64(w[i-2],c61),rshift64(w[i-2],c6)))
 			end
 			a,b,c,d,e,f,g,h=ha[0],ha[1],ha[2],ha[3],ha[4],ha[5],ha[6],ha[7]
 			for i=0,79 do
-				temp1=add64(h,bxor64(rrotate64(e,c14),rrotate64(e,c18),rrotate64(e,c41)),bxor64(band64(e,f),band64(bnot64(e),g)),k[i],w[i])
-				a,b,c,d,e,f,g,h=add64(temp1,add64(bxor64(rrotate64(a,c28),rrotate64(a,c34),rrotate64(a,c39)),bxor64(band64(a,b),band64(a,c),band64(b,c)))),a,b,c,add64(d,temp1),e,f,g
+				temp1=add64(h,b3xor64(rrotate64(e,c14),rrotate64(e,c18),rrotate64(e,c41)),{bxor(band(e[1],f[1]),band(bnot(e[1]),g[1])),bxor(band(e[2],f[2]),band(bnot(e[2]),g[2]))},k[i],w[i])
+				a,b,c,d,e,f,g,h=add64(temp1,b3xor64(rrotate64(a,c28),rrotate64(a,c34),rrotate64(a,c39)),{bxor(band(a[1],b[1]),band(a[1],c[1]),band(b[1],c[1])),bxor(band(a[2],b[2]),band(a[2],c[2]),band(b[2],c[2]))}),a,b,c,add264({d[1],d[2]},temp1),e,f,g
 			end
-			ha[0],ha[1],ha[2],ha[3],ha[4],ha[5],ha[6],ha[7]=add64(ha[0],a),add64(ha[1],b),add64(ha[2],c),add64(ha[3],d),add64(ha[4],e),add64(ha[5],f),add64(ha[6],g),add64(ha[7],h)
+			ha[0],ha[1],ha[2],ha[3],ha[4],ha[5],ha[6],ha[7]=add264(ha[0],a),add264(ha[1],b),add264(ha[2],c),add264(ha[3],d),add264(ha[4],e),add264(ha[5],f),add264(ha[6],g),add264(ha[7],h)
 		end
 		cnv=nohex and num2chars64 or num2hex64
 		return
@@ -358,11 +373,11 @@ do
 	}
 
 	function crc32(txt,nohex)
-		local crc=bit.bnot(0)
+		local crc=0xFFFFFFFF
 		for l1=1,#txt do
-			crc=bit.bxor(bit.rshift(crc,8),crc32dat[bit.bxor(bit.band(crc,0xFF),txt:byte(l1,l1))+1])
+			crc=bxor(rshift(crc,8),crc32dat[bxor(crc%256,byte(txt,l1))+1])
 		end
-		return nohex and bit.bnot(crc) or 
+		return nohex and bit.bnot(crc) or num2hex(crc)
 	end
 end
 
@@ -433,11 +448,11 @@ do
 		{0x66e7a46c,0x27f3aa2c},{0x1c3fd4a4,0x17c62355},{0x935745fc,0x4798b8de},{0xe98f3534,0x77ad31a7},
 		{0xa6df411f,0xbfb21ca3},{0xdc0731d7,0x8f8795da},{0x536fa08f,0xdfd90e51},{0x29b7d047,0xefec8728}
 	}
-	
+	local c8={0,8}
 	function crc64(txt,nohex)
-		local crc=bnot64(0)
+		local crc={0xFFFFFFFF,0xFFFFFFFF}
 		for l1=1,#txt do
-			crc=bxor64(crc64dat[bxor64(crc,byte(txt))],rshift64(crc,8))
+			crc=bxor64(crc64dat[bxor(crc[2],byte(txt,l1))%256],rshift64(crc,c8))
 		end
 		return nohex and crc or num2hex64(crc)
 	end
@@ -455,7 +470,10 @@ do
 		local sch=state.sch
 		local k={}
 		for i=1,len do
-			sch[state.i],sch[state.j]=(state.j+sch[state.i-1])%256,(state.i+1)%256
+			state.i=(state.i+1)%256
+			state.j=(state.j+sch[state.i-1])%256
+			local t=sch[state.i]
+			sch[state.i],sch[state.j]=sch[state.j],sch[state.i]
 			k[i]=sch[(sch[state.i-1]+sch[state.j-1]-1)%256]
 		end
 		local out=""
@@ -482,7 +500,7 @@ do
 			sch=sch
 		}
 		return function(txt)
-			return cipher(txt,state)
+			return crypt(txt,state)
 		end,state
 	end
 end
@@ -619,8 +637,9 @@ return {
 		sha512=sha512,
 		sha256=sha256,
 	},
-	checksum={
+	sum={
 		crc32=crc32,
+		crc64=crc64,
 	},
 	encrypt={
 		rc4=function(key,state)
@@ -634,7 +653,7 @@ return {
 		rc4=function(key,state)
 			local decrypt,state=rc4(key,state)
 			return function(txt,nohex)
-				return nohex and encrypt(txt) or tohex(fromhex(txt))
+				return nohex and decrypt(txt) or decrypt(unhex(txt))
 			end,state
 		end,
 	},
@@ -643,7 +662,7 @@ return {
 		hex=tohex,
 		rot13=rot13,
 		rot47=rot47,
-	}
+	},
 	decode={
 		b64=unb64,
 		hex=unhex,
