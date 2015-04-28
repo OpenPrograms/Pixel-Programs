@@ -1,6 +1,9 @@
+ConsoleUtils:
+	/blob/master/console.lua
+	Fancy console formatting and serialization
 crypt:
 	/blob/master/crypt.lua
-	all in one crypto library
+	All in one crypto library
 bit64:
 	/blob/master/bit64.lua
 	bit library that supports 64 bit integers
