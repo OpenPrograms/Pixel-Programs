@@ -15,7 +15,7 @@
 	│text│               
 	└────┘                          
 
-	> console.table({{"first","column"},{"second\ncolumn"},{"foo","bar","potato"}})
+	> console.table({{"first","column"},{"second\ncolumn"},{"foo","potatowalrus","bar"}})
 	┌──────┬─────────────┬───┐
 	│first │column       │   │
 	├──────┼─────────────┼───┤
