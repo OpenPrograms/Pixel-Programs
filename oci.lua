@@ -258,12 +258,21 @@ local function render(data,x,y)
 		s[n]=o
 		return o
 	end})
+	local lbg
 	for l1=1,#data,3 do
 		local w=data:byte(l1+1)
 		local h=data:byte(l1+2)
 		-- fill space
-		gpu.setBackground(c8to24(data:byte(l1)))
-		gpu.fill(x+cx-1,y+cy-1,w,h," ")
+		local nbg = c8to24(data:byte(l1))
+		if nbg~=lbg then
+			gpu.setBackground(nbg)
+			lbg = nbg
+		end
+		if w==1 and h==1 then
+			gpu.set(x+cx-1,y+cy-1," ")
+		else
+			gpu.fill(x+cx-1,y+cy-1,w,h," ")
+		end
 		for sy=cy,cy+h-1 do
 			for sx=cx,cx+w-1 do
 				f[sy][sx]=true
